@@ -105,7 +105,7 @@ jobs:
       - name: Assume bounded reviewer role via OIDC
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
-          role-to-assume: ${{ vars.REVIEWER_ROLE_ARN }}
+          role-to-assume: ${{ secrets.REVIEWER_ROLE_ARN }}
           aws-region: us-west-2
           role-duration-seconds: 1800
           inline-session-policy: >-
@@ -215,7 +215,7 @@ jobs:
       - name: Assume bounded reviewer role via OIDC
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
-          role-to-assume: ${{ vars.REVIEWER_ROLE_ARN }}
+          role-to-assume: ${{ secrets.REVIEWER_ROLE_ARN }}
           aws-region: us-west-2
           role-duration-seconds: 900
           inline-session-policy: >-

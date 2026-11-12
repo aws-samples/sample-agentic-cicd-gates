@@ -23,9 +23,11 @@ workflows target `main`; choose explicit release branches when adapting them.
    approved gates checkout. Inspect its generated manifest and destination policy
    before accepting them; the script replaces `.reviewer.yaml`. Keep the artifact's
    own threat-model data, boundary policy and vendor verifier.
-4. Provision/review the OIDC role and set the repository variable
-   `REVIEWER_ROLE_ARN`. With the root Python virtualenv prepared, an explicit
-   repository selection avoids inheriting the auth stack's demo defaults:
+4. Provision/review the OIDC role and set the repository secret
+   `REVIEWER_ROLE_ARN`. It is a secret rather than a variable so Actions masks
+   the role ARN, and with it your AWS account ID, in public run logs. With the
+   root Python virtualenv prepared, an explicit repository selection avoids
+   inheriting the auth stack's demo defaults:
 
    ```bash
    : "${TARGET_REPO:?Set owner/repository}"
@@ -33,7 +35,7 @@ workflows target `main`; choose explicit release branches when adapting them.
      -c "repo=$TARGET_REPO")
    # Set REVIEWER_ROLE_ARN from the inspected ReviewerRoleArn stack output:
    : "${REVIEWER_ROLE_ARN:?Set the role ARN for this repository}"
-   gh variable set REVIEWER_ROLE_ARN --repo "$TARGET_REPO" --body "$REVIEWER_ROLE_ARN"
+   gh secret set REVIEWER_ROLE_ARN --repo "$TARGET_REPO" --body "$REVIEWER_ROLE_ARN"
    ```
 
    The role stack creates a GitHub OIDC provider; reconcile an existing provider
