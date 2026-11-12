@@ -1,0 +1,15 @@
+# Trust boundaries this threat model MUST cover (validate.py coverage check).
+# Declaring a boundary with no referencing threat fails the gate.
+boundaries:
+  - id: TB-CONTROL
+    name: Gate control plane
+    description: The reviewer's own prompts, rules, harness, and credentials — the surface an author would have to reach to change how they are judged
+  - id: TB-DATA
+    name: Function to datastore
+    description: Service queries against the user datastore
+  - id: TB-INGRESS
+    name: Caller to function
+    description: Untrusted invocation input crossing into the service
+  - id: TB-PIPELINE
+    name: Change author to production
+    description: Code/infra changes flowing through the delivery pipeline

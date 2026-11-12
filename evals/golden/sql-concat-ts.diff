@@ -1,0 +1,14 @@
+diff --git a/src/repo.ts b/src/repo.ts
+index aaaa111..bbbb222 100644
+--- a/src/repo.ts
++++ b/src/repo.ts
+@@ -4,6 +4,10 @@ export class UserRepo {
+   constructor(private readonly db: Client) {}
+ 
++  async findByEmail(email: string) {
++    const sql = "SELECT * FROM users WHERE email = '" + email + "'";
++    return this.db.query(sql);
++  }
+   async count() {
+     return this.db.query("SELECT COUNT(*) FROM users");
+   }

@@ -1,0 +1,279 @@
+# Only trusted base tooling executes. The head checkout is data, in a sibling
+# directory; Python runs isolated and checkout never persists credentials.
+# The pull_request workflow definition itself is mutable: this guard is defense
+# in depth, NOT a substitute for CODEOWNERS, rulesets, or restricted AWS trust.
+# Private checks report results. Public merge enforcement requires settings.
+name: Agentic review gate (monorepo)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monorepo-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: /tmp
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  REVIEW_TOOL: ${{ github.workspace }}/base-tooling/pr-surface/pr-reviewer/review_pr.py
+  REVIEWER_RULES: ${{ github.workspace }}/base-tooling/.reviewer.yaml
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Refuse forks before loading PR data or credentials
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ "$HEAD_REPOSITORY" != "$GITHUB_REPOSITORY" ]; then
+            echo 'Fork PR: credentialed review is unsupported; maintainer review required.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Load trusted tooling at the event base SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-tooling
+          persist-credentials: false
+      - name: Load PR head as data only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head-data
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require v2 tooling already installed on the trusted base
+        run: |
+          if ! grep -qx 'WORKFLOW_CONTRACT = 2' "$REVIEW_TOOL"; then
+            echo 'Base tooling lacks v2 guard/analyze/publish. Maintainer bootstrap required; no head-tooling fallback.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Validate actors, revision, automation changes, and data tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -I "$REVIEW_TOOL" guard --repo-root "$GITHUB_WORKSPACE/head-data"
+
+  analyze:
+    needs: guard
+    outputs:
+      report_id: ${{ steps.evidence.outputs.artifact-id }}
+    runs-on: ubuntu-latest
+    # Outlasts the longest single call it waits on: one Bedrock call at the
+    # full read timeout (1,126 s, READ_TIMEOUT_SECONDS in
+    # agent/reviewer/bedrock_reviewer.py), plus a normal four-seat panel
+    # (302 s, 2026-10-02) and setup (~2 min) = 1,548 s, rounded up. A cap,
+    # not a charge: runner minutes are billed as used. The OIDC session below
+    # lasts as long (the role allows 1 hour).
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Load trusted tooling at the event base SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-tooling
+          persist-credentials: false
+      - name: Load PR head as data only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head-data
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned runtime dependencies outside the PR tree
+        run: |
+          python -I -m venv "$RUNNER_TEMP/reviewer-venv"
+          "$RUNNER_TEMP/reviewer-venv/bin/python" -I -m pip install --quiet boto3==1.43.72 PyYAML==6.0.3
+          echo "$RUNNER_TEMP/reviewer-venv/bin" >> "$GITHUB_PATH"
+      - name: Assume bounded reviewer role via OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.REVIEWER_ROLE_ARN }}
+          aws-region: us-west-2
+          role-duration-seconds: 1800
+          inline-session-policy: >-
+            {"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+            "Action":["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],
+            "Resource":"*"}]}
+      - name: Analyze the SHA-scoped diff (no GitHub write token)
+        run: |
+          python -I "$REVIEW_TOOL" analyze --repo-root "$GITHUB_WORKSPACE/head-data" \
+            --report "$RUNNER_TEMP/review-report.json"
+      - name: Retain bounded review evidence for this run and attempt
+        id: evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: review-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-report.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # This remains the required 'review' check. It fails if analysis did not
+  # complete, publication fails, evidence is stale, or policy reports a block.
+  review:
+    needs: [guard, analyze]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Require an eligible context (never silently skip this check)
+        env:
+          GUARD_RESULT: ${{ needs.guard.result }}
+        run: |
+          if [ "$GUARD_RESULT" != success ]; then
+            echo 'Context guard failed: no check performed. Inspect the guard job.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Require completed analysis
+        env:
+          ANALYSIS_RESULT: ${{ needs.analyze.result }}
+          REPORT_ID: ${{ needs.analyze.outputs.report_id }}
+        run: |
+          if [ "$ANALYSIS_RESULT" != success ] || ! [[ "$REPORT_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'Review unavailable: analysis did not finish; no PASS or approval.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Load trusted tooling at the event base SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-tooling
+          persist-credentials: false
+      - name: Install pinned runtime dependencies outside the PR tree
+        run: |
+          python -I -m venv "$RUNNER_TEMP/reviewer-venv"
+          "$RUNNER_TEMP/reviewer-venv/bin/python" -I -m pip install --quiet boto3==1.43.72 PyYAML==6.0.3
+          echo "$RUNNER_TEMP/reviewer-venv/bin" >> "$GITHUB_PATH"
+      - name: Download only this run's report (data, never executable)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          # Immutable ID from the trusted analysis job, not a discoverable
+          # name that an untrusted tests job could upload/replace.
+          artifact-ids: ${{ needs.analyze.outputs.report_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/review-input
+      - name: Validate evidence and publish per-reviewer results (never approve)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -I "$REVIEW_TOOL" publish --report "$RUNNER_TEMP/review-input/review-report.json"
+
+  deterministic:
+    needs: guard
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Require an eligible context (never silently skip this check)
+        env:
+          GUARD_RESULT: ${{ needs.guard.result }}
+        run: |
+          if [ "$GUARD_RESULT" != success ]; then
+            echo 'Context guard failed: no check performed. Inspect the guard job.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Load trusted tooling at the event base SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-tooling
+          persist-credentials: false
+      - name: Load PR head as data only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head-data
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned runtime dependencies outside the PR tree
+        run: |
+          python -I -m venv "$RUNNER_TEMP/reviewer-venv"
+          "$RUNNER_TEMP/reviewer-venv/bin/python" -I -m pip install --quiet boto3==1.43.72 PyYAML==6.0.3
+          echo "$RUNNER_TEMP/reviewer-venv/bin" >> "$GITHUB_PATH"
+      - name: Assume bounded reviewer role via OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.REVIEWER_ROLE_ARN }}
+          aws-region: us-west-2
+          role-duration-seconds: 900
+          inline-session-policy: >-
+            {"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+            "Action":"access-analyzer:ValidatePolicy","Resource":"*"}]}
+      - name: Deterministic IaC and repository checks using base tooling
+        run: |
+          python -I "$GITHUB_WORKSPACE/base-tooling/deterministic/checks.py" \
+            --repo-root "$GITHUB_WORKSPACE/head-data" \
+            --templates "$GITHUB_WORKSPACE/head-data/template.yaml" --region us-west-2 \
+            --allow-no-templates
+      - name: Report monorepo coverage
+        run: |
+          echo 'No deployed template is expected in this repository. This lane checks repository invariants; the artifact repository owns template.yaml.' >> "$GITHUB_STEP_SUMMARY"
+
+  threat-model:
+    needs: guard
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Require an eligible context (never silently skip this check)
+        env:
+          GUARD_RESULT: ${{ needs.guard.result }}
+        run: |
+          if [ "$GUARD_RESULT" != success ]; then
+            echo 'Context guard failed: no check performed. Inspect the guard job.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Load trusted tooling at the event base SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-tooling
+          persist-credentials: false
+      - name: Load PR head as data only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head-data
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned validator dependency
+        run: |
+          python -I -m venv "$RUNNER_TEMP/reviewer-venv"
+          "$RUNNER_TEMP/reviewer-venv/bin/python" -I -m pip install --quiet PyYAML==6.0.3
+          echo "$RUNNER_TEMP/reviewer-venv/bin" >> "$GITHUB_PATH"
+      - name: Validate head model data against base boundary policy
+        run: |
+          # --no-renames: a renamed template is listed under its old name too.
+          git -C "$GITHUB_WORKSPACE/head-data" diff --no-ext-diff --no-textconv --no-renames \
+            --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed.txt"
+          git -C "$GITHUB_WORKSPACE/head-data" show "$BASE_SHA:threat-model/app.tc.json" \
+            > "$RUNNER_TEMP/base-model.json" 2>/dev/null || : > "$RUNNER_TEMP/base-model.json"
+          python -I "$GITHUB_WORKSPACE/base-tooling/threat-model/validate.py" \
+            --model "$GITHUB_WORKSPACE/head-data/threat-model/app.tc.json" \
+            --boundaries "$GITHUB_WORKSPACE/base-tooling/threat-model/boundaries.yaml" \
+            --changed-files "$RUNNER_TEMP/changed.txt" \
+            --base-model "$RUNNER_TEMP/base-model.json"

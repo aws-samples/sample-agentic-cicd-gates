@@ -1,0 +1,39 @@
+diff --git a/src/ui/panel.html b/src/ui/panel.html
+new file mode 100644
+index 0000000..2b3c4d5
+--- /dev/null
++++ b/src/ui/panel.html
+@@ -0,0 +1,26 @@
++<!doctype html>
++<html lang="en">
++<head>
++  <meta charset="utf-8">
++  <title>Fleet panel</title>
++  <style>
++    body { background: #0b0e14; color: #e6edf3; font: 16px/1.5 system-ui, sans-serif; }
++    .meta { color: #9aa7b8; font-size: 0.875rem; }   /* 7.4:1 on the background */
++    button {
++      background: #1f2430; color: #e6edf3; border: 1px solid #6e7681;
++      border-radius: 6px; padding: 0.5rem 0.75rem; cursor: pointer;
++    }
++    :focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
++  </style>
++</head>
++<body>
++  <main>
++    <h1>Fleet panel</h1>
++    <p class="meta">Last synced two minutes ago</p>
++    <button type="button" id="restart">Restart node</button>
++    <img src="/static/node-health.png" width="240" height="80"
++         alt="Node health over the last hour: steady, no restarts">
++    <p id="result" role="status" aria-live="polite"></p>
++  </main>
++  <script>
++    document.getElementById('restart').addEventListener('click', async () => {
++      const res = await fetch('/nodes/restart', { method: 'POST' });
++      document.getElementById('result').textContent =
++        res.ok ? 'Restart requested.' : 'Restart failed. Try again.';
++    });
++  </script>
++</body>
++</html>

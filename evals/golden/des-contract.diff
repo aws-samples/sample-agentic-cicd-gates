@@ -1,0 +1,20 @@
+diff --git a/src/billing.py b/src/billing.py
+index 3333333..4444444 100644
+--- a/src/billing.py
++++ b/src/billing.py
+@@ -8,12 +8,14 @@
+-def charge(conn, user, amount_cents):
+-    """Charge a user. Returns the new balance in cents."""
++def charge(conn, user, amount_cents, currency="USD"):
++    """Charge a user. Returns a dict {balance_cents, currency, receipt_id}."""
+     conn.execute(
+         "UPDATE accounts SET balance = balance - ? WHERE owner = ?",
+         (amount_cents, user))
+     row = conn.execute(
+         "SELECT balance FROM accounts WHERE owner = ?", (user,)).fetchone()
+-    return row[0]
++    receipt = conn.execute(
++        "INSERT INTO receipts (owner, amount) VALUES (?, ?) RETURNING id",
++        (user, amount_cents)).fetchone()
++    return {"balance_cents": row[0], "currency": currency,
++            "receipt_id": receipt[0]}

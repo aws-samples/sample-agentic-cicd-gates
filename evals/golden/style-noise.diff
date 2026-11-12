@@ -1,0 +1,13 @@
+diff --git a/src/order.py b/src/order.py
+index 2c2c2c2..3d3d3d3 100644
+--- a/src/order.py
++++ b/src/order.py
+@@ -1,9 +1,9 @@
+-def total(items,tax):
+-    """Sum line items with tax."""
+-    s=sum(i.price for i in items)
+-    return s*(1+tax)
++def total(items, tax):
++    """Sum line items with tax."""
++    subtotal = sum(item.price for item in items)
++    return subtotal * (1 + tax)

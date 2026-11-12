@@ -1,0 +1,20 @@
+diff --git a/src/ui/alerts.css b/src/ui/alerts.css
+index 3c4d5e6..4d5e6f7 100644
+--- a/src/ui/alerts.css
++++ b/src/ui/alerts.css
+@@ -12,3 +12,14 @@
+ .alert {
+   border-radius: 6px;
+   padding: 0.5rem 0.75rem;
+ }
++
++/* Draw the eye to a firing alert. */
++.alert--critical {
++  animation: alert-flash 0.18s steps(1) infinite;
++}
++
++@keyframes alert-flash {
++  50% { opacity: 0.1; }
++}
++
++.alert--critical .spinner { animation: spin 0.6s linear infinite; }

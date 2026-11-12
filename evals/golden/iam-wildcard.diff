@@ -1,0 +1,12 @@
+diff --git a/infra/app.template.json b/infra/app.template.json
+index eeee555..ffff666 100644
+--- a/infra/app.template.json
++++ b/infra/app.template.json
+@@ -12,7 +12,12 @@
+       "Properties": {
+         "Policies": [{
+           "PolicyName": "svc",
+-          "PolicyDocument": {"Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::demo-bucket/*"}]}
++          "PolicyDocument": {"Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}
+         }]
+       }
