@@ -73,7 +73,8 @@ PIN_PYENV = ('if command -v pyenv >/dev/null 2>&1; then'
 GATE_PYTHON_ENV = {"PYTHONSAFEPATH": "1", "PYTHONNOUSERSITE": "1"}
 
 PY_INSTALL = {"runtime-versions": {"python": "3.12"},
-              "commands": [PIN_PYENV, "python -I -m pip install --quiet boto3 pyyaml"]}
+              "commands": [PIN_PYENV, "python -I -m pip install --quiet boto3==1.43.72 "
+                                      "botocore==1.43.72 PyYAML==6.0.3"]}
 
 # The operator-approved starting commit (deploy/README.md, "Approved starting
 # commit"). prepare_review.py uses it only when the pipeline history has no
@@ -205,7 +206,7 @@ REVIEW_BUILD_SPEC = codebuild.BuildSpec.from_object(
                 "runtime-versions": {"python": "3.12"},
                 # Do not depend on the managed image's floating AWS CLI version.
                 "commands": [PIN_PYENV] + [
-                    "python -I -m pip install --quiet boto3==1.43.72 botocore==1.43.72 pyyaml",
+                    "python -I -m pip install --quiet boto3==1.43.72 botocore==1.43.72 PyYAML==6.0.3",
                     "python -I -c \"import botocore.session; assert 'IfNoneMatch' in botocore.session.Session().get_service_model('s3').operation_model('PutObject').input_shape.members\"",
                 ],
             },
@@ -247,7 +248,8 @@ def _deterministic_build_spec(allow_no_templates: bool = False):
             "phases": {
                 "install": {"runtime-versions": {"python": "3.12"},
                             "commands": [PIN_PYENV,
-                                         "python -I -m pip install --quiet boto3 pyyaml"]},
+                                         "python -I -m pip install --quiet boto3==1.43.72 "
+                                         "botocore==1.43.72 PyYAML==6.0.3"]},
                 "build": {
                     "commands": [FETCH_DET_TOOLS] + [
                         # 1) wildcard IAM + Access Analyzer ValidatePolicy (blocking)
@@ -340,9 +342,9 @@ DASHBOARD_DEPLOY_BUILD_SPEC = codebuild.BuildSpec.from_object(
                     # app.py`, so the deploy needs that virtualenv to exist. Built
                     # from the repo's pinned requirements.txt, which is the same
                     # list a reader installs — so CI and a laptop resolve
-                    # identically instead of "works on mine".
+                    # identically instead of "works on mine". The venv keeps the
+                    # pip that ships with the image's Python; no unpinned upgrade.
                     "python3 -I -m venv .venv",
-                    ".venv/bin/python -I -m pip install -q --upgrade pip",
                     ".venv/bin/python -I -m pip install -q -r requirements.txt",
                     "bash dashboard/deploy.sh",
                 ]
