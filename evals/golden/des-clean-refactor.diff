@@ -1,0 +1,46 @@
+diff --git a/src/db.py b/src/db.py
+index 5555555..6666666 100644
+--- a/src/db.py
++++ b/src/db.py
+@@ -20,6 +20,12 @@
+ def list_orders(conn, owner):
+     cur = conn.execute(
+         "SELECT * FROM orders WHERE owner = ? ORDER BY id DESC", (owner,))
+     return [dict(r) for r in cur.fetchall()]
++
++
++def list_orders_by_status(conn, owner, status):
++    """Owner's orders filtered by status, newest first."""
++    cur = conn.execute(
++        "SELECT * FROM orders WHERE owner = ? AND status = ? ORDER BY id DESC",
++        (owner, status))
++    return [dict(r) for r in cur.fetchall()]
+diff --git a/src/handlers.py b/src/handlers.py
+index 7777777..8888888 100644
+--- a/src/handlers.py
++++ b/src/handlers.py
+@@ -10,3 +10,9 @@
+ def list_orders(conn, headers):
+     user = auth.verify(headers.get("authorization"))
+     return {"status": 200, "body": db.list_orders(conn, user)}
++
++
++def list_orders_filtered(conn, headers, params):
++    """GET /orders?status=... — routed through the db layer."""
++    user = auth.verify(headers.get("authorization"))
++    body = db.list_orders_by_status(conn, user, params.get("status", "open"))
++    return {"status": 200, "body": body}
+diff --git a/tests/test_handlers.py b/tests/test_handlers.py
+index 9999999..aaaaaaa 100644
+--- a/tests/test_handlers.py
++++ b/tests/test_handlers.py
+@@ -12,3 +12,10 @@
+ def test_list_orders(conn):
+     out = handlers.list_orders(conn, HDRS)
+     assert out["status"] == 200
++
++
++def test_list_orders_filtered(conn):
++    out = handlers.list_orders_filtered(conn, HDRS, {"status": "open"})
++    assert out["status"] == 200
++    assert all(o["status"] == "open" for o in out["body"])

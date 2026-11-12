@@ -1,0 +1,10 @@
+diff --git a/infra/queue_stack.py b/infra/queue_stack.py
+index a1a1a1a..b2b2b2b 100644
+--- a/infra/queue_stack.py
++++ b/infra/queue_stack.py
+@@ -14,6 +14,12 @@ class QueueStack(Stack):
+         fn = lambda_.Function(self, "Consumer", ...)
++        fn.add_to_role_policy(iam.PolicyStatement(
++            actions=["sqs:ReceiveMessage", "sqs:DeleteMessage"],
++            resources=[queue.queue_arn],
++        ))

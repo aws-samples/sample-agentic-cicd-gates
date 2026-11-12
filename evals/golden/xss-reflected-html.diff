@@ -1,0 +1,13 @@
+diff --git a/src/dedication.py b/src/dedication.py
+new file mode 100644
+--- /dev/null
++++ b/src/dedication.py
+@@ -0,0 +1,8 @@
++def handler(event, context):
++    """Render the visitor's dedication."""
++    dedication = (event.get("queryStringParameters") or {}).get("dedication", "")
++    return {
++        "statusCode": 200,
++        "headers": {"Content-Type": "text/html; charset=utf-8"},
++        "body": f"<p>{dedication}</p>",
++    }

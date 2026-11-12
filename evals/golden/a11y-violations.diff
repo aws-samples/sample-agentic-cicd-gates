@@ -1,0 +1,27 @@
+diff --git a/src/ui/panel.html b/src/ui/panel.html
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/src/ui/panel.html
+@@ -0,0 +1,22 @@
++<!doctype html>
++<html>
++<head>
++  <meta charset="utf-8">
++  <title>Fleet panel</title>
++  <style>
++    body { background: #0b0e14; font: 14px sans-serif; }
++    .meta { color: #3d4451; font-size: 12px; }
++    .action { background: #1f2430; color: #cdd3de; padding: 6px 10px; cursor: pointer; }
++  </style>
++</head>
++<body>
++  <div class="title">Fleet panel</div>
++  <div class="meta">Last synced two minutes ago</div>
++  <div class="action" onclick="restart()">Restart node</div>
++  <img src="/static/node-health.png" width="240" height="80">
++  <script>
++    function restart() { fetch('/nodes/restart', { method: 'POST' }); }
++  </script>
++</body>
++</html>

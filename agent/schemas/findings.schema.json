@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aws-samples/sample-agentic-cicd-gates/agent/schemas/findings.schema.json",
+  "title": "Agentic gate findings report",
+  "description": "Contract between the reviewer (any tier) and the gate. verdict is COMPUTED by the harness from stats.blocking, never emitted by the model. verdict.py enforces this in code; this schema documents the wire shape for other consumers.",
+  "type": "object",
+  "required": ["verdict", "stats", "findings"],
+  "properties": {
+    "verdict": {"enum": ["PASS", "FAIL", "ADVISORY_ERROR", "BLOCKED_ERROR"]},
+    "stats": {
+      "type": "object",
+      "required": ["total", "blocking"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "blocking": {"type": "integer", "minimum": 0},
+        "suppressed_below_threshold": {"type": "integer", "minimum": 0}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "path", "line", "message", "confidence", "blocking"],
+        "properties": {
+          "rule_id": {"type": "string", "pattern": "^[A-Z0-9]+-[0-9]+$"},
+          "path": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "line": {"type": "integer", "minimum": 0},
+          "category": {"type": "string"},
+          "severity": {"enum": ["low", "medium", "high", "critical"]},
+          "blocking": {"type": "boolean"},
+          "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+          "message": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "suggested_code": {"type": ["string", "null"], "maxLength": 2000}
+        }
+      }
+    },
+    "error": {"type": ["string", "null"]}
+  }
+}

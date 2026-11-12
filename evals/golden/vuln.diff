@@ -1,0 +1,12 @@
+diff --git a/src/db.py b/src/db.py
+index 1111111..2222222 100644
+--- a/src/db.py
++++ b/src/db.py
+@@ -10,4 +10,8 @@ def get_user(conn, username):
+-    cur = conn.execute("SELECT * FROM users WHERE name = ?", (username,))
++    query = f"SELECT * FROM users WHERE name = '{username}'"
++    cur = conn.execute(query)
+     return cur.fetchone()
++
++def debug_dump(event):
++    print("pipeline event:", event)  # includes artifactCredentials from CodePipeline

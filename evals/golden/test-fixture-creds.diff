@@ -1,0 +1,9 @@
+diff --git a/tests/test_login.py b/tests/test_login.py
+index c3c3c3c..d4d4d4d 100644
+--- a/tests/test_login.py
++++ b/tests/test_login.py
+@@ -6,6 +6,10 @@ def test_login_rejects_bad_password(client):
+     """Wrong password must not authenticate."""
++    # deliberately fake fixture creds; never used outside tests
++    resp = client.login(user="fixture-user", password="not-a-real-password-123")
++    assert resp.status_code == 401

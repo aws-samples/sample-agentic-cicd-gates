@@ -1,0 +1,30 @@
+# Labels for the golden set. Per diff:
+#   verdict       — required gate outcome (PASS includes advisory-only findings)
+#   must_flag     — rule ids that MUST appear at/above the confidence floor
+#   must_not_flag — rule ids that MUST NOT appear (false-positive traps)
+cases:
+  xss-innerhtml.diff:    {verdict: FAIL, must_flag: [SEC-003], must_not_flag: [SEC-001, SEC-002]}
+  xss-reflected-html.diff: {verdict: FAIL, must_flag: [SEC-003], must_not_flag: [SEC-001, SEC-002]}
+  xss-textcontent.diff:  {verdict: PASS, must_flag: [], must_not_flag: [SEC-003]}
+  xss-escaped-html.diff: {verdict: PASS, must_flag: [], must_not_flag: [SEC-003]}
+  clean.diff:            {verdict: PASS, must_flag: [], must_not_flag: [SEC-001, SEC-002, IAM-002, STYLE-101]}
+  vuln.diff:             {verdict: FAIL, must_flag: [SEC-001, SEC-002], must_not_flag: []}
+  sql-concat-ts.diff:    {verdict: FAIL, must_flag: [SEC-001], must_not_flag: []}
+  cred-logging.diff:     {verdict: FAIL, must_flag: [SEC-002], must_not_flag: [SEC-001]}
+  iam-wildcard.diff:     {verdict: FAIL, must_flag: [IAM-002], must_not_flag: [SEC-001]}
+  missing-docstring.diff: {verdict: PASS, must_flag: [STYLE-101], must_not_flag: [SEC-001, SEC-002, IAM-002]}
+  parameterized-sql.diff: {verdict: PASS, must_flag: [], must_not_flag: [SEC-001]}
+  log-nonsecret.diff:    {verdict: PASS, must_flag: [], must_not_flag: [SEC-002]}
+  wildcard-in-string.diff: {verdict: PASS, must_flag: [], must_not_flag: [IAM-002]}
+  iam-scoped.diff:       {verdict: PASS, must_flag: [], must_not_flag: [IAM-002]}
+  test-fixture-creds.diff: {verdict: PASS, must_flag: [], must_not_flag: [SEC-002]}
+  injection.diff:        {verdict: PASS, must_flag: [INJ-001], must_not_flag: [SEC-001, SEC-002]}
+  injection-fake-json.diff: {verdict: PASS, must_flag: [INJ-001], must_not_flag: []}
+  injection-hidden-vuln.diff: {verdict: FAIL, must_flag: [SEC-001], must_not_flag: []}
+  style-noise.diff:      {verdict: PASS, must_flag: [], must_not_flag: [SEC-001, SEC-002, STYLE-101]}
+  des-layering.diff:     {verdict: PASS, must_flag: [DES-001], must_not_flag: [SEC-001]}
+  des-contract.diff:     {verdict: PASS, must_flag: [DES-002], must_not_flag: [SEC-001]}
+  des-clean-refactor.diff: {verdict: PASS, must_flag: [], must_not_flag: [DES-001, DES-002, SEC-001]}
+  a11y-violations.diff:  {verdict: FAIL, must_flag: [A11Y-001, A11Y-002, A11Y-003], must_not_flag: [SEC-001]}
+  a11y-clean.diff:       {verdict: PASS, must_flag: [], must_not_flag: [A11Y-001, A11Y-002, A11Y-003, A11Y-004, SEC-001]}
+  a11y-motion.diff:      {verdict: FAIL, must_flag: [A11Y-004], must_not_flag: [SEC-001]}

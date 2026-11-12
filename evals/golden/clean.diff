@@ -1,0 +1,10 @@
+diff --git a/src/math_util.py b/src/math_util.py
+index 5555555..6666666 100644
+--- a/src/math_util.py
++++ b/src/math_util.py
+@@ -1,2 +1,6 @@
++def add(a: int, b: int) -> int:
++    """Return the sum of a and b."""
++    return a + b
+ def existing():
+     return 1

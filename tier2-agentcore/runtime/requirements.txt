@@ -1,0 +1,27 @@
+# Pinned, transitive dependencies included, to exactly what the image
+# deployed 2026-08-20 contains (ECR digest sha256:5cfa8977...), so a rebuild
+# installs the same packages. It does not reproduce that image: the base is
+# pinned by digest in the Dockerfile to Python 3.12.15 on Debian 13.7, where the
+# 2026-08-20 build pulled the then-current 3.12.14 on 13.6. Raise versions
+# deliberately, in their own change.
+bedrock-agentcore==1.21.0
+boto3==1.43.72
+botocore==1.43.72
+PyYAML==6.0.3
+annotated-types==0.8.0
+anyio==4.14.2
+click==8.4.2
+h11==0.16.0
+idna==3.18
+jmespath==1.1.0
+pydantic==2.13.4
+pydantic-core==2.46.4
+python-dateutil==2.9.0.post0
+s3transfer==0.19.2
+six==1.17.0
+starlette==1.6.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+urllib3==2.7.0
+uvicorn==0.52.3
+websockets==17.0.1

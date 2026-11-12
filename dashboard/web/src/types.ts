@@ -1,0 +1,103 @@
+export type Action = { name: string; status: string; when?: string | null; url?: string; reason?: string | null };
+export type Failure = { pipeline: string; stage: string; action: string; reason?: string | null;
+                 url?: string; log?: string[]; gate_headline?: string; gate_reason?: string[] };
+export type Stage = { name: string; status: string; actions: Action[] };
+export type Pipeline = { name: string; stages: Stage[]; console: string; error?: string };
+export type Agent = { name: string; model: string; thinking: string; verdict: string; blocking: number; error?: string | null };
+export type Finding = { rule_id: string; path: string; line: number; message: string; severity: string; blocking: boolean; confidence: number; agent?: string };
+export type Report = { verdict: string; stats: { blocking: number; total: number }; findings: Finding[]; agents: Agent[]; error?: string; report_body?: string } | null;
+export type PanelMeta = { name: string; emoji: string; model: string; thinking: string; rules: string; blocking: boolean | null; persona: string };
+export type Progress = { active: boolean; agents: Record<string, { state: string; verdict?: string; blocking?: number; discovered?: number }> } | null;
+export type Review = {
+  persona: string; verdict: string; state: string; submitted?: string; url: string;
+  blocking?: number | null; total?: number | null; suppressed?: number | null;
+  model?: string | null; thinking?: string | null;
+  report_body?: string; error?: string; findings?: PrFinding[];
+  id?: number; commit_id?: string; run_id?: string; run_attempt?: number;
+  review_ids?: number[]; is_current?: boolean; history_reason?: string;
+  evidence?: Evidence;
+};
+export type ReviewHistory = Review & {
+  id: number; commit_id: string; review_ids: number[]; report_body: string;
+  findings: PrFinding[]; is_current: boolean;
+};
+export type PrFinding = {
+  persona: string; rule_id: string; severity: string; blocking: boolean;
+  confidence: string; path?: string | null; line?: number | null;
+  outdated?: boolean; message: string; url?: string;
+};
+export type PrRow = { number: number; title: string; head: string; url: string; updated: string; state?: "open" | "merged" | "closed"; checks?: { name: string; status: string; conclusion?: string | null; url: string }[] };
+export type CommitRow = { sha: string; message: string; status: string; execution_id: string; started?: string };
+export type ReviewAttempt = {
+  build_id: string; action_execution_id?: string; status: string; started?: string;
+  ended?: string; url?: string; is_current: boolean;
+};
+export type FeedItem = { ts: string; source: string; persona?: string | null; status: string;
+                  text: string; detail?: [string, string][]; url?: string;
+                  historic?: boolean };
+export type Evidence = { state: string; reason: string; revision?: string; execution_id?: string; build_id?: string; recorded_at?: string; policy_origin?: string; policy_sha256?: string; baseline_revision?: string; baseline_kind?: string };
+export type Health = {
+  kind?: 'codebuild';
+  repo?: string;
+  service?: string;
+  target?: string;
+  state: 'not_started' | 'unavailable' | 'not_applicable' | 'observing' | 'completed' | 'rolled_back' | 'failed';
+  label: string;
+  reason: string;
+  execution_id?: string;
+  revision?: string;
+  observed_at: string;
+  binding?: string;
+  deployment?: {
+    service?: string; action_execution_id?: string;
+    id: string; status: string; url: string;
+    original_version?: string; target_version?: string; started?: string; completed?: string;
+    alarm_triggered?: boolean;
+  };
+  rollback?: { id: string; status: string; url: string; target_version?: string };
+  alarms: {
+    name: string; state: string; reason: string; updated?: string; url: string;
+    transitions: { at: string; state: string; summary: string }[];
+  }[];
+  current?: {
+    alias: string; version: string; revision?: string; weights: Record<string, number>;
+    matches_selected_revision: boolean;
+  };
+  errors: string[];
+};
+export type Snapshot = {
+  health?: Health;
+  execution_started?: string | null;
+  selection_error?: string | null;
+  selection_state?: 'selected' | 'not_found' | 'unavailable';
+  review_evidence?: Record<string, Evidence>;
+  policy_metadata?: { source?: string; sha256?: string };
+  generated_at: string;
+  commit?: { sha?: string; message?: string } | null;
+  commits: CommitRow[];
+  executions?: CommitRow[];
+  selected_execution?: string | null;
+  review_attempts?: ReviewAttempt[];
+  review_attempts_evidence?: Evidence;
+  review_attempt?: { build_id: string; report: Report; evidence: Evidence } | null;
+  selected_review_build?: string | null;
+  selected_commit?: string | null;
+  repos?: { key: string; label: string; repo: string; tiers: boolean;
+            deploys?: boolean; deploy_target?: string; deploy_service?: string }[];
+  selected_repo?: string;
+  pipelines: Record<string, Pipeline>;
+  findings: { tier1: Report; tier2: Report; tier3: Report };
+  panel_meta: PanelMeta[];
+  panel_progress: Progress;
+  tiers?: { tier1: string; tier2: string; tier3: string };
+  pr: { evidence?: Evidence; open: PrRow[]; closed?: PrRow[]; detail?: { pr: PrRow; reviews: Review[]; history?: ReviewHistory[]; review_running?: boolean; findings?: PrFinding[] } | null };
+  feed: FeedItem[];
+  failures: Failure[];
+  approval?: { stage: string; action: string; url?: string; since?: string | null } | null;
+  live?: boolean;
+  execution?: string | null;
+  execution_status?: string | null;
+  degraded?: Record<string, string>;
+  site: string;
+  repo: Record<string, string>;
+};

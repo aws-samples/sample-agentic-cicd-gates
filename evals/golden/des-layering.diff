@@ -1,0 +1,23 @@
+diff --git a/src/handlers.py b/src/handlers.py
+index 1111111..2222222 100644
+--- a/src/handlers.py
++++ b/src/handlers.py
+@@ -1,6 +1,7 @@
+ """HTTP handlers. Data access lives in src/db.py; handlers stay storage-free."""
+ from . import auth, db
++import sqlite3
+ 
+ 
+ def list_orders(conn, headers):
+     """GET /orders — the caller's orders via the db layer."""
+     user = auth.verify(headers.get("authorization"))
+     return {"status": 200, "body": db.list_orders(conn, user)}
++
++
++def list_refunds(conn, headers):
++    """GET /refunds — quick path: query here instead of adding a db helper."""
++    user = auth.verify(headers.get("authorization"))
++    cur = conn.execute(
++        "SELECT * FROM refunds WHERE requested_by = ? ORDER BY id DESC",
++        (user,))
++    return {"status": 200, "body": [dict(r) for r in cur.fetchall()]}

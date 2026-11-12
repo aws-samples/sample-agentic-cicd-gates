@@ -1,0 +1,14 @@
+# Python dependencies for the CDK apps and the gate tooling in this repo.
+#
+# Every cdk.json here points at ../../.venv/bin/python, so a clone needs this
+# virtualenv before `cdk deploy` will run:
+#
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+#
+# The road's own Deploy stage does exactly that, which is how this file earns
+# its keep: the pipeline installs from the same pinned list a reader does, so
+# "it worked on my laptop" and "it worked in CI" mean the same thing.
+aws-cdk-lib==2.265.0
+constructs==10.8.1
+boto3==1.43.72
+PyYAML==6.0.3

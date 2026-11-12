@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "applicationInfo": {
+    "name": "agentic-gates-demo-hello",
+    "description": "Demo Lambda service deployed through the gated pipeline",
+    "lastReviewed": "2026-08-17 \u2014 vuln revert reviewed, no new threats introduced"
+  },
+  "threats": [
+    {
+      "id": "T-002",
+      "statement": "A malicious change author [TB-PIPELINE] can embed instructions to the review agent in code comments, which leads to the gate approving a harmful change if verdicts followed model prose",
+      "stride": [
+        "E"
+      ],
+      "mitigations": [
+        "Verdicts derive from rule metadata, never prose",
+        "INJ-001 flags attempts",
+        "Guardrails prompt-attack filter"
+      ]
+    },
+    {
+      "id": "T-006",
+      "statement": "An actor able to read the Tier 3 build environment [TB-INGRESS] can exfiltrate the managed-harness API key, which leads to impersonation of the reviewing identity and quota abuse [TB-DATA]",
+      "stride": [
+        "S",
+        "I"
+      ],
+      "mitigations": [
+        "KIRO_API_KEY injected by CodeBuild from Secrets Manager (agentic-gates/kiro-api-key) at runtime; never in the template, repo, or log",
+        "Secret value is never echoed by the gate; only its absence is reported",
+        "Accepted residual risk: the key is user-identity-bound, so it is weaker for non-repudiation and offboarding than Tier 1/2 keyless OIDC \u2014 recorded deliberately as the cost of a managed harness"
+      ]
+    },
+    {
+      "id": "T-007",
+      "statement": "An author whose change would be blocked [TB-INGRESS] can weaken the managed harness by editing its prompt, rules, or gate script in the same commit, which leads to a gate that approves its own bypass [TB-CONTROL]",
+      "stride": [
+        "T",
+        "E"
+      ],
+      "mitigations": [
+        "Rules and gate tooling are read from the BASE ref (git show $BASE:.reviewer.yaml), never the candidate commit",
+        "The harness is asked for findings only; the verdict is computed by the shared verdict engine from rule metadata",
+        "Unknown or malformed findings invalidate the response; blocking reviewers fail closed rather than silently dropping evidence",
+        "The deterministic lane fails the build if a duplicate reviewer/ package exists anywhere in the repo. This closed a REAL instance of this threat class rather than a theoretical one: the PR surface shipped a vendored copy of the core beside review_pr.py, and because Python puts a script's own directory ahead of PYTHONPATH that copy silently won - so the surface reviewed with a fork that had drifted 100 lines from the tested core. Nobody edited it to weaken a gate; drift alone was enough.",
+        "The lane also fails if the dashboard's panel description disagrees with .reviewer.yaml on seat name or model, in either direction, so the board cannot report a panel the gate is not running."
+      ]
+    },
+    {
+      "id": "T-008",
+      "statement": "A managed harness that fails, times out, or is unauthenticated [TB-CONTROL] can return no findings, which leads to a silent clean verdict for an unreviewed change [TB-DATA]",
+      "stride": [
+        "T",
+        "D"
+      ],
+      "mitigations": [
+        "A missing API key produces per-reviewer errors; blocking reviewers stop the managed gate, never an empty PASS",
+        "Seats owning blocking rules fail closed (BLOCKED_ERROR) regardless of global fail_mode",
+        "Every run is bounded and always writes a report; the dashboard surfaces the error text instead of hiding it"
+      ]
+    },
+    {
+      "id": "T-009",
+      "statement": "A contributor able to add or edit any workflow file in either trusted repo [TB-PIPELINE] can assume the reviewer role from a workflow that is not the review workflow, which leads to unauthorized Bedrock inference billed to this account [TB-DATA]",
+      "stride": [
+        "S",
+        "E"
+      ],
+      "mitigations": [
+        "The role's only permission is bedrock:InvokeModel, scoped to the anthropic/openai inference-profile and foundation-model ARNs \u2014 no data-plane, storage, or IAM access is reachable with it",
+        "max_session_duration is 1 hour, so a leaked session expires without intervention",
+        "The sub condition pins owner and repo name literally; only the numeric id segments are wildcarded",
+        "GitHub does not grant id-token: write to pull_request runs from untrusted forks, so an outside contributor cannot obtain the OIDC token via a PR \u2014 this holds only while the workflow uses pull_request and never pull_request_target",
+        "Accepted residual risk (deliberate): the sub claim is repo:<owner>/<name>:* \u2014 ANY workflow, ref, or event in either repo, not just agentic-review.yml. Narrowing to an environment: or ref:refs/heads/main claim was rejected because the review workflow legitimately runs on PR head refs from arbitrary branches. Widening from one repo to two doubles the set of workflow files that constitute this trust surface",
+        "Accepted residual risk: the '@*' numeric-id wildcard pins the identity by NAME rather than by immutable GitHub id, so an owner/repo rename or a released-then-reclaimed login would still match. Pinning the exact ownerId/repoId is the hardening step if this leaves a demo account"
+      ]
+    },
+    {
+      "id": "T-010",
+      "statement": "A second tier trio now reviews THIS repository \u2014 the one that contains the gate implementation \u2014 so a contributor who can merge to the road's main [TB-PIPELINE] is editing the reviewer and the reviewed in one commit, which could weaken the judgement applied to that very change [TB-CONTROL]",
+      "stride": [
+        "T",
+        "E"
+      ],
+      "mitigations": [
+        "Gate tooling is pipeline-owned, not source-owned: Tier 1 pins agent/, deterministic/ and threat-model/ as s3_assets captured at DEPLOY time, so a commit that rewrites the reviewer is still judged by the reviewer deployed before it. The same holds for Tier 3, whose harness bundle is staged at synth time, and Tier 2, whose container image is built at deploy time",
+        "Both trios are separate stacks with separate roles, buckets and log groups, so the road's gate cannot read or write the artifact trio's findings",
+        "The PR surface loads .reviewer.yaml, the reviewer core and the gate tooling from the BASE ref, so a pull request cannot swap its own reviewer or rules",
+        "Accepted residual risk: the road trio doubles the number of roles able to read the road's source and invoke Bedrock. Both trios' review roles remain scoped to bedrock:InvokeModel on named inference profiles, with no data-plane access",
+        "The dashboard reads each trio's reports bucket name from its Tier 1 stack output under cloudformation:DescribeStacks scoped to two stack ARNs. The first implementation scanned s3:ListAllMyBuckets, which has no resource-level form and so had to be granted on Resource \"*\" - this project's own IAM-002 rule blocked that commit on the road's Tier 1 and Tier 2, and the wildcard was removed rather than exempted",
+        "Tier1 pins review policy as a deployment asset, independent from the candidate source. Policy updates require separate review and evaluation; diff review does not prove the entire repository meets newly introduced policy.",
+        "Every S3 asset a Tier1 gate build fetches (the review policy and the agent, review-input, deterministic and threat-model packages) is pinned at deployment to one object version and a SHA-256 of its content. Each build fetches that version and stops on a missing version, a failed read or a mismatch before the asset runs or is read, so a later write to the shared CDK asset bucket cannot change the rules or tooling a review uses. Every gate build also runs Python isolated (python -I, with PYTHONSAFEPATH=1 and PYTHONNOUSERSITE=1 as a second guard) and pins the pyenv interpreter from outside the checkout, so a file in the change under review (a json.py at the repository root, a .python-version) is never imported or used to choose the interpreter; before this, a candidate json.py ran with the review role after the asset checks and could rewrite the checked rules and tooling",
+        "The dashboard deployment uses a separate deploy action after operator approval. Its deployment permissions are not held by the model reviewer.",
+        "Accepted residual risk: the road's deterministic lane scans no CloudFormation template. This repository deploys CDK apps and has no template.yaml, so the cdk trio passes --allow-no-templates. The road's own IaC is reviewed by the model reviewers and the threat-model lane; its synthesized templates are not checked by checks.py, because synthesizing them would run the candidate's code inside a gate."
+      ]
+    },
+    {
+      "id": "T-011",
+      "statement": "A multi-commit push, rejected revision, missing baseline or truncated diff [TB-PIPELINE] can conceal changes from a reviewer [TB-CONTROL], allowing release progression on incomplete evidence.",
+      "stride": [
+        "T"
+      ],
+      "mitigations": [
+        "Tier1 binds source revision to current execution and compares against the last successful release completed before this execution started; failed releases cannot advance this baseline",
+        "First Tier1 deployment reviews full tree; unavailable history, absent Git revision or oversized diff stops review",
+        "Tier2 uses explicit independently approved initialization, Git-format text diffs, conditional accepted-baseline promotion and no promotion after errors or rejection",
+        "Reports record source/baseline revisions and policy/diff hashes; missing evidence is distinct from PASS",
+        "Tier1 must retain an execution-keyed report before its review build can succeed; SHA-only copies are convenience links, not the immutable audit record."
+      ]
+    },
+    {
+      "id": "T-012",
+      "statement": "The optional AWS Continuum scan action [TB-PIPELINE] uploads the released revision to an S3 bucket and starts a code scan, so an over-broad grant on that action could let it write outside the scan's prefix or drive scans against environments other than its own [TB-CONTROL]",
+      "stride": [
+        "I",
+        "E"
+      ],
+      "mitigations": [
+        "Off by default: unset or -c enable_continuum=false synthesizes none of it, so a stack that does not opt in has no Continuum action, project, role or grant at all",
+        "The stack creates no Continuum integration, environment, bucket or service role: the operator creates those and passes their identifiers, so no role in this stack is assumable by the continuum service principal and the stack holds no Create/Delete integration or environment permission",
+        "Outside the pipeline's own artifact bucket, the scan project may write only s3:PutObject and only under the code/ prefix of the one named source bucket (a wildcard under a named bucket, not an account-wide bucket wildcard); it also writes the pipeline artifact bucket, CloudWatch Logs and its CodeBuild report group, as every gate action does",
+        "The scan project may call only continuum:CreateCodeScan, GetCodeScan and ListCodeIssues, and only on the one named environment ARN passed in context (environments/<id>, not environments/*); it holds no Bedrock or other data-plane access",
+        "Advisory only: the scan's findings never change the gate verdict or block a release, which stay with the reviewer and the fixed rules, and its script always exits 0; like any pipeline action it can still fail (a CodeBuild-level failure or the project timeout), which fails the stage until retried; it reports what Continuum found in the approval note"
+      ]
+    }
+  ],
+  "lastReviewed": "2026-10-02 \u2014 v2 input provenance, baseline correctness, strict evidence validation and separated GitHub analysis/publication. No claim that model findings are complete or calibrated. Execution-keyed report retention is required; dashboard streaming runtime updated from deprecated Node.js20 to24 without changing its role permissions. 2026-10-02: reviewer dependencies now install in isolated runner temporary virtualenvs; no OS package replacement or permission broadening. Release traceability update: pipeline source SHA is passed as a SAM parameter and Lambda environment value. It identifies the delivered candidate and gives restored-source releases an explicit versioned configuration change."
+}

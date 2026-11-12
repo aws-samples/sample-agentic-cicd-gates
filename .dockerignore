@@ -1,0 +1,15 @@
+# Image build context = repo root (Dockerfile: tier2-agentcore/runtime/Dockerfile).
+# Only agent/reviewer + tier2-agentcore/runtime are copied into the image; keep
+# everything else (especially cdk.out — recursive!) out of the context.
+.git
+.venv
+**/cdk.out
+**/__pycache__
+**/.pytest_cache
+tier1-codebuild
+tier2-agentcore/infra
+tier2-agentcore/gate
+docs
+evals
+sample-app
+threat-model

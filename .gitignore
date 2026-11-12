@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+cdk.out/
+.pytest_cache/
+*.egg-info/
+.DS_Store
+.env
+reports/
+
+# Local Tier 3 harness transcripts (per-seat, written next to the report)
+kiro-transcript-*.txt
+findings.json

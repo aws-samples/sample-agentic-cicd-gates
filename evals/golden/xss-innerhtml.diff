@@ -1,0 +1,7 @@
+diff --git a/web/src/dedication.js b/web/src/dedication.js
+new file mode 100644
+--- /dev/null
++++ b/web/src/dedication.js
+@@ -0,0 +1,2 @@
++const dedication = new URLSearchParams(window.location.search).get("dedication") || "";
++document.getElementById("dedication").innerHTML = dedication;

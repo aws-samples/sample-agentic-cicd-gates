@@ -1,0 +1,36 @@
+# Deterministic lane — cfn-guard rules.
+# Run: cfn-guard validate --data <template> --rules rules.guard
+# Encodes the same intent as agent rule IAM-002 — layering on purpose: the agent
+# owns application code paths; these own the templates, deterministically.
+# NOTE: comparisons are gated on is_string — CFN intrinsics (!Sub/!Ref) resolve
+# to maps, and map-vs-string comparisons would otherwise false-fail the rule.
+
+let iam_policies = Resources.*[ Type in ['AWS::IAM::Policy', 'AWS::IAM::ManagedPolicy'] ]
+rule iam_policy_no_wildcard_action when %iam_policies !empty {
+    %iam_policies.Properties.PolicyDocument.Statement[*] {
+        when Effect == "Allow" Action is_string {
+            Action != "*"
+            <<IAM-GUARD-001: Allow statements must not use Action:'*'>>
+        }
+    }
+}
+
+let sam_fns = Resources.*[ Type == 'AWS::Serverless::Function' ]
+rule sam_function_no_wildcard_policy when %sam_fns !empty {
+    %sam_fns.Properties {
+        when Policies exists {
+            Policies[*].Statement[*] {
+                when Effect == "Allow" {
+                    when Action is_string {
+                        Action != "*"
+                        <<IAM-GUARD-002: SAM function inline policies must not use Action:'*'>>
+                    }
+                    when Resource is_string {
+                        Resource != "*"
+                        <<IAM-GUARD-003: SAM function inline policies must not use Resource:'*'>>
+                    }
+                }
+            }
+        }
+    }
+}

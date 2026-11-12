@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.asset/
+cdk.out/
+__pycache__/
+app/web
+tests/.playwright-cli/
+tests/presenter-*.png
+tests/history-*.png

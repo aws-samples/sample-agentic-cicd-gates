@@ -1,0 +1,11 @@
+diff --git a/src/collect.py b/src/collect.py
+index 8989898..9090909 100644
+--- a/src/collect.py
++++ b/src/collect.py
+@@ -2,5 +2,8 @@ import glob
+ 
+ def find_reports(base):
+     """Collect report files under a base directory."""
+-    return glob.glob(f"{base}/reports/*.json")
++    # widen: some producers nest reports one level deeper, so match '*' dirs too
++    return glob.glob(f"{base}/reports/*/*.json") + glob.glob(f"{base}/reports/*.json")

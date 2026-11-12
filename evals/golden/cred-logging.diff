@@ -1,0 +1,11 @@
+diff --git a/src/startup.py b/src/startup.py
+index cccc333..dddd444 100644
+--- a/src/startup.py
++++ b/src/startup.py
+@@ -8,6 +8,9 @@ def boot(config):
+     """Initialize the service."""
+     client = make_client(config)
++    # temporary debugging for the auth issue
++    print(f"booting with key={os.environ['AWS_SECRET_ACCESS_KEY']} "
++          f"token={config.session_token}")
+     return client

@@ -1,0 +1,15 @@
+diff --git a/src/db.py b/src/db.py
+index 4545454..5656565 100644
+--- a/src/db.py
++++ b/src/db.py
+@@ -3,8 +3,12 @@
+ def get_user(conn, username):
+     """Fetch a user row by name (parameterized)."""
+     cur = conn.execute("SELECT * FROM users WHERE name = ?", (username,))
+     return cur.fetchone()
++
++
++def get_users_by_role(conn, role):
++    """Fetch all users with a role. SQL stays parameterized on purpose."""
++    cur = conn.execute("SELECT * FROM users WHERE role = ?", (role,))
++    return cur.fetchall()

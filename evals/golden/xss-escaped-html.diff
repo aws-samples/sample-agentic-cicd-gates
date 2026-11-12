@@ -1,0 +1,16 @@
+diff --git a/src/dedication.py b/src/dedication.py
+new file mode 100644
+--- /dev/null
++++ b/src/dedication.py
+@@ -0,0 +1,11 @@
++import html
++
++
++def handler(event, context):
++    """Render an HTML-escaped visitor dedication in a text node."""
++    dedication = (event.get("queryStringParameters") or {}).get("dedication", "")
++    return {
++        "statusCode": 200,
++        "headers": {"Content-Type": "text/html; charset=utf-8"},
++        "body": f"<p>{html.escape(dedication, quote=True)}</p>",
++    }

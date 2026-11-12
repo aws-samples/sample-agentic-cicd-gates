@@ -1,0 +1,19 @@
+# Owners of the files that decide how later changes are reviewed: the
+# reviewer rules, the workflow that loads them, the reviewer code that workflow
+# loads from the base branch, and the other files the pull-request guard
+# freezes. GitHub and GitLab both read a CODEOWNERS file at the repository
+# root, so this one file serves both.
+#
+# This file names owners; it does not enforce them. Require code-owner review
+# in branch protection or a ruleset, with no bypass. In your own copy, name a
+# team that has write access to your repository.
+/.reviewer.yaml                @aws-samples/sample-agentic-cicd
+/rules/                        @aws-samples/sample-agentic-cicd
+/.github/                      @aws-samples/sample-agentic-cicd
+/agent/reviewer/               @aws-samples/sample-agentic-cicd
+/pr-surface/                   @aws-samples/sample-agentic-cicd
+/deterministic/                @aws-samples/sample-agentic-cicd
+/threat-model/validate.py      @aws-samples/sample-agentic-cicd
+/threat-model/boundaries.yaml  @aws-samples/sample-agentic-cicd
+.gitattributes                 @aws-samples/sample-agentic-cicd
+/CODEOWNERS                    @aws-samples/sample-agentic-cicd
