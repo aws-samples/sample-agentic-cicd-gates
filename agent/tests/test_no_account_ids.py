@@ -1,7 +1,7 @@
 """No real AWS account ID ships in this repository.
 
 Only AWS documentation's example account IDs (and runs of one digit) may
-appear. When release-manifest.yaml is present (the internal source repository),
+appear. When release-manifest.yaml is present (a pre-release working copy),
 only the files it publishes are scanned; in a published copy there is no
 manifest, so every tracked file is scanned.
 """
