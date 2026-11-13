@@ -40,6 +40,9 @@ def parse(rows, **kwargs):
     {**VALID, "message": "m" * 2001},
     {**VALID, "suggested_code": {}},
     {**VALID, "suggested_code": "x" * 2001},
+    {**VALID, "zz": [{**VALID, "rule_id": "SEC-001"}]},
+    {**VALID, "severity": {"x": [VALID]}},
+    {**VALID, "blocking": [VALID]},
 ])
 def test_invalid_finding_rejects_entire_response(raw):
     with pytest.raises(FindingsValidationError):
@@ -52,6 +55,29 @@ def test_required_fields(field):
     raw.pop(field)
     with pytest.raises(FindingsValidationError):
         parse([raw])
+
+
+@pytest.mark.parametrize("raw", [
+    # Diff text copied with raw quotes closes the findings array and opens a
+    # key that would swallow the real finding after it.
+    '{"findings":[{"rule_id":"SEC-003","path":"web/src/main.js","line":2,'
+    '"message":"x","confidence":90}],"y":[{"rule_id":"SEC-003",'
+    '"path":"web/src/main.js","line":3,"message":"m","confidence":95}]}',
+    json.dumps({"findings": [VALID], "verdict": "PASS"}),
+    '{"findings":[' + json.dumps(VALID) + '],"findings":[]}',
+    '{"findings":[{"rule_id":"SEC-003","path":"web/src/main.js","line":2,'
+    '"message":"m","confidence":95,"confidence":10}]}',
+], ids=["key-swallows-finding", "extra-top-level-key", "repeated-findings-key",
+        "repeated-key-in-finding"])
+def test_keys_outside_the_contract_or_repeated_are_rejected(raw):
+    with pytest.raises(FindingsValidationError):
+        parse_model_findings(raw, RS)
+
+
+def test_every_contract_key_is_still_accepted():
+    row = {**VALID, "severity": "low", "blocking": False, "suggested_code": None}
+    finding = parse([row])[0]
+    assert (finding.rule_id, finding.confidence) == ("SEC-003", 95)
 
 
 def test_valid_empty_and_discovery_without_confidence():

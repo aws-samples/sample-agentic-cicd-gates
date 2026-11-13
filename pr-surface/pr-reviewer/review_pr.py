@@ -258,7 +258,12 @@ def validate_report(report, ctx, rules_path):
         scoped = dataclasses.replace(ruleset, rules=tuple(
             r for r in ruleset.rules if not agent.rules
             or any(r.id.startswith(prefix) for prefix in agent.rules)))
-        findings = verdict.parse_model_findings(json.dumps(doc), scoped)
+        if not isinstance(doc, dict):
+            raise ValueError("malformed review result")
+        # The model contract is the findings alone; the rest of the stored
+        # result is checked below by recomputing it from those findings.
+        findings = verdict.parse_model_findings(
+            json.dumps({"findings": doc.get("findings")}), scoped)
         for f in findings:
             if agent.file_patterns and not any(
                     fnmatch.fnmatch(f.path, p) or fnmatch.fnmatch("/" + f.path, p)
