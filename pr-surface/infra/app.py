@@ -6,12 +6,17 @@ role can only invoke Bedrock on Anthropic and OpenAI models and validate IAM
 policies.
 
 Deploy:  npx -y aws-cdk@2.1144.0 deploy -c repo=OWNER/REPO[,OWNER/REPO]
+Pinned:  -c repo=OWNER@OWNER_ID/REPO@REPO_ID[,...] trusts only those exact ids
+         (`gh api repos/OWNER/REPO --jq '.owner.id, .id'`).
 """
+import re
+
 import aws_cdk as cdk
 from aws_cdk import Stack, aws_iam as iam
 from constructs import Construct
 
 GITHUB_OIDC_URL = "https://token.actions.githubusercontent.com"
+PINNED_RE = re.compile(r"[^@/]+@\d+/[^@/]+@\d+")
 
 
 class PrReviewerAuthStack(Stack):
@@ -32,33 +37,45 @@ class PrReviewerAuthStack(Stack):
             client_ids=["sts.amazonaws.com"],
         )
 
+        # Hardened option: name each repo with its numeric ids,
+        # OWNER@<ownerId>/NAME@<repoId>, and the trust matches that exact sub
+        # claim (StringEquals), so a renamed or re-created repo cannot assume
+        # the role. Pin every repo or none: one condition holds them all.
+        pinned = [r for r in repos if PINNED_RE.fullmatch(r)]
+        if pinned and len(pinned) != len(repos):
+            raise ValueError("pin every repository as OWNER@ID/NAME@ID, or none")
+        if not pinned and any("@" in r for r in repos):
+            raise ValueError("a pinned repository is OWNER@ID/NAME@ID with numeric ids")
+
         subs: list[str] = []
         for repo in repos:
             owner, name = repo.split("/", 1)
+            if pinned:
+                subs.append(f"repo:{repo}:pull_request")
+                continue
             # Pull-request runs only: the workflow runs on pull_request, so no
             # push, tag or environment context may assume this role. Two
             # patterns per repo because GitHub's sub claim can embed numeric
             # ids (repo:owner@<ownerId>/name@<repoId>:...); the legacy
             # repo:owner/name:... form is kept for older deployments.
-            # Hardened option: pin the exact ids instead of '@*'.
             subs += [f"repo:{repo}:pull_request", f"repo:{owner}@*/{name}@*:pull_request"]
+
+        conditions = {"StringEquals": {
+            "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"}}
+        # Pull-request runs of these repos only, nothing else.
+        if pinned:
+            conditions["StringEquals"]["token.actions.githubusercontent.com:sub"] = subs
+        else:
+            conditions["StringLike"] = {"token.actions.githubusercontent.com:sub": subs}
 
         role = iam.Role(
             self, "PrReviewerRole",
             role_name="agentic-gates-pr-reviewer",
             max_session_duration=cdk.Duration.hours(1),
             assumed_by=iam.WebIdentityPrincipal(
-                provider.open_id_connect_provider_arn,
-                conditions={
-                    "StringEquals": {
-                        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"},
-                    # Pull-request runs of these repos only, nothing else.
-                    "StringLike": {
-                        "token.actions.githubusercontent.com:sub": subs},
-                },
-            ),
+                provider.open_id_connect_provider_arn, conditions=conditions),
             description="Bedrock-only reviewer role for GitHub Actions in "
-                        + ", ".join(repos),
+                        + ", ".join(re.sub(r"@\d+", "", r) for r in repos),
         )
         role.add_to_policy(iam.PolicyStatement(
             sid="BedrockInvokeAnthropicOnly",
