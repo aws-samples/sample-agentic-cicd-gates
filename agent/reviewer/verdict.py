@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from enum import Enum
 
 from .rules import RuleSet
@@ -36,6 +36,23 @@ class Finding:
 
 class FindingsValidationError(ValueError):
     """Model output did not conform to the findings contract."""
+
+
+# The answer may hold the findings contract and nothing else. A key outside it
+# is not harmless noise: diff text the model copies into a message with raw
+# quotes can close the findings array, or a finding, and open a new key, and a
+# real finding under that key would drop out of the verdict unseen. A repeated
+# key is refused for the same reason: json.loads keeps only the last one.
+FINDING_KEYS = frozenset(f.name for f in fields(Finding))
+
+
+def _unique_keys(pairs):
+    doc = {}
+    for key, value in pairs:
+        if key in doc:
+            raise FindingsValidationError("model output repeats a JSON key")
+        doc[key] = value
+    return doc
 
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
@@ -73,11 +90,12 @@ def parse_model_findings(raw_text: str, ruleset: RuleSet, *,
     """
     text = normalize_model_text(raw_text)
     try:
-        doc = json.loads(text)
+        doc = json.loads(text, object_pairs_hook=_unique_keys)
     except json.JSONDecodeError as exc:
         raise FindingsValidationError(f"model output is not valid JSON: {exc}") from exc
-    if not isinstance(doc, dict) or not isinstance(doc.get("findings"), list):
-        raise FindingsValidationError('model output must be {"findings": [...]}')
+    if (not isinstance(doc, dict) or set(doc) != {"findings"}
+            or not isinstance(doc["findings"], list)):
+        raise FindingsValidationError('model output must be {"findings": [...]} and nothing else')
     if len(doc["findings"]) > ruleset.max_findings:
         raise FindingsValidationError("findings exceeds max_findings; refusing to truncate")
 
@@ -88,6 +106,12 @@ def parse_model_findings(raw_text: str, ruleset: RuleSet, *,
 
         if not isinstance(raw, dict):
             invalid("must be an object")
+        if not set(raw) <= FINDING_KEYS:
+            invalid("has a key outside the findings contract")
+        # Ignored below, but typed, so nothing can be nested under them either.
+        if (not isinstance(raw.get("severity", ""), str)
+                or not isinstance(raw.get("blocking", False), bool)):
+            invalid("severity must be a string and blocking a boolean")
         rule = ruleset.by_id(raw.get("rule_id"))
         if rule is None:
             invalid("unknown or missing rule_id")
