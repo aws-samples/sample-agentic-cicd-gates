@@ -85,7 +85,7 @@ def _without_hunk_headers(text: str) -> str:
 
 
 _HUNK_HEADER = re.compile(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-_GIT_HEADER = re.compile(r'("(?:\\.|[^"])*"|a/.*?) ("(?:\\.|[^"])*"|b/.*)')
+_GIT_HEADER = re.compile(r'("(?:\\.|[^"\\])*"|a/.*?) ("(?:\\.|[^"\\])*"|b/.*)')
 
 
 def _hunks(text: str) -> list[tuple[str, list[str]]]:

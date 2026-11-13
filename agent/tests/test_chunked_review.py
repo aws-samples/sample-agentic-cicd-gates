@@ -726,3 +726,14 @@ def test_stride_single_chunk_is_one_call_over_the_whole_diff(planner, tmp_path, 
                         str(write_plan(planner, tmp_path, diff, 100_000)))
     assert len(model.users) == 1 and diff in model.users[0]
     assert set(report) == {"advisory", "proposed_threats", "rationale", "error"}
+
+
+def test_git_header_regex_does_not_backtrack_exponentially():
+    # [^"] also matched a backslash, so '"\!\!...' could split 2^n ways (CodeQL py/redos):
+    # n=26 took 5-9 seconds before the fix. One prefix per quoted group.
+    for prefix in ('"', '"" "'):
+        start = time.monotonic()
+        assert chunked._GIT_HEADER.fullmatch(prefix + '\\!' * 26) is None
+        assert time.monotonic() - start < 1, prefix
+    quoted = r'"a/sp\"ace \\x" "b/sp\"ace \\x"'
+    assert chunked._GIT_HEADER.fullmatch(quoted).group(2) == r'"b/sp\"ace \\x"'
