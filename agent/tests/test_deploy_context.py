@@ -107,11 +107,20 @@ def test_redeploy_paths_carry_an_explicit_source():
     assert "deploy --require-approval never -c source=codecommit" in makefile
     assert "destroy --force -c source=codecommit" in makefile
     redeploy = (ROOT / "scripts/redeploy_tiers.sh").read_text()
-    assert '-c github_branch="${TIER1_BRANCH}"' in redeploy
-    assert 'TIER1_BRANCH="${TIER1_BRANCH:?' in redeploy
-    assert "only sanctioned path" not in redeploy
     road = (ROOT / "scripts/deploy_road_tiers.sh").read_text()
-    assert "-c github_branch=main" in road
+    assert "only sanctioned path" not in redeploy
+    # Both scripts take every flag from the one demo context file.
+    for script, arrays in ((redeploy, ("T1", "T2", "T3")),
+                           (road, ("T1ROAD", "T2ROAD", "T3ROAD"))):
+        assert "source scripts/demo_context.sh" in script
+        for name in arrays:
+            assert f'"${{{name}[@]}}"' in script
+    # Each array names its source explicitly; none relies on a default.
+    demo = (ROOT / "scripts/demo_context.sh").read_text()
+    for name in ("T1", "T1ROAD", "T2", "T2ROAD", "T3", "T3ROAD"):
+        [line] = [ln for ln in demo.splitlines() if ln.startswith(f"{name}=(")]
+        block = demo[demo.index(line):].split(")", 1)[0]
+        assert "-c source=codecommit" in block, name
 
 
 # --- Tier 2 applies the same rules -----------------------------------------------------
@@ -191,11 +200,15 @@ def test_tier2_deploy_paths_carry_the_complete_source_context():
     makefile = (ROOT / "Makefile").read_text()
     assert "cd tier2-agentcore/infra && CDK_DOCKER=$${CDK_DOCKER:-finch} npx -y aws-cdk@2.1144.0 " \
            "deploy --require-approval never -c source=codecommit" in makefile
-    for script in ("scripts/redeploy_tiers.sh", "scripts/deploy_road_tiers.sh"):
+    for script, name in (("scripts/redeploy_tiers.sh", "T2"),
+                         ("scripts/deploy_road_tiers.sh", "T2ROAD")):
         text = (ROOT / script).read_text()
         tier2 = text[text.index("tier2-agentcore/infra"):].split("echo")[0]
-        assert "-c github_branch=main" in tier2 and "-c connection_arn=" in tier2
-        assert "-c github_repo=" in tier2 and "-c stack_id=" in tier2
+        assert f'"${{{name}[@]}}"' in tier2
+    demo = (ROOT / "scripts/demo_context.sh").read_text()
+    for name in ("T2", "T2ROAD"):
+        [line] = [ln for ln in demo.splitlines() if ln.startswith(f"{name}=(")]
+        assert "-c stack_id=" in line and "-c source=codecommit" in line
 
 
 def test_the_gate_asset_ignores_bytecode_left_by_local_runs(tmp_path):
@@ -299,3 +312,58 @@ def test_a_runtime_only_rollback_changes_the_image_and_keeps_the_gate(synth, loa
     assert tool.main(["--current", str(tmp_path / "bad.json"), "--previous",
                       str(tmp_path / "previous.json"), "--out", str(tmp_path / "x.json")]) == 1
     assert "REFUSED" in capsys.readouterr().out and not (tmp_path / "x.json").exists()
+
+
+# --- Tier 3's CodeCommit source and the PR reviewer's pinned trust ---------------------
+
+def _run_app(app_dir, context, tmp_path):
+    """Synthesize one CDK app file in a subprocess, as the CLI does (context and
+    output directory in the environment). Returns (process, output directory)."""
+    env = {**os.environ, "CDK_CONTEXT_JSON": json.dumps(context), "CDK_OUTDIR": str(tmp_path)}
+    proc = subprocess.run([sys.executable, "app.py"], cwd=ROOT / app_dir, env=env,
+                          capture_output=True, text=True, timeout=180)
+    return proc, tmp_path
+
+
+ART_PINNED = "example-org@111/sample-agentic-cicd-artifact@222"
+GATES_PINNED = "example-org@111/sample-agentic-cicd-gates@333"
+
+
+def test_pr_reviewer_trust_pins_exact_repository_ids(tmp_path):
+    proc, out = _run_app("pr-surface/infra", {"repo": f"{ART_PINNED},{GATES_PINNED}"}, tmp_path)
+    assert proc.returncode == 0, proc.stderr
+    resources = json.loads((out / "PrReviewerAuthStack.template.json").read_text())["Resources"]
+    [role] = [r["Properties"] for r in resources.values() if r["Type"] == "AWS::IAM::Role"
+              and r["Properties"].get("RoleName") == "agentic-gates-pr-reviewer"]
+    [statement] = role["AssumeRolePolicyDocument"]["Statement"]
+    assert statement["Condition"] == {"StringEquals": {
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+        "token.actions.githubusercontent.com:sub": [
+            f"repo:{ART_PINNED}:pull_request", f"repo:{GATES_PINNED}:pull_request"]}}
+    assert "@" not in role["Description"]
+
+
+@pytest.mark.parametrize("repos", [f"{ART_PINNED},example-org/other",
+                                   "example-org@x/name@1"])
+def test_pr_reviewer_refuses_partial_or_malformed_pinning(tmp_path, repos):
+    proc, _ = _run_app("pr-surface/infra", {"repo": repos}, tmp_path)
+    assert proc.returncode != 0 and "OWNER@ID/NAME@ID" in proc.stderr
+
+
+@pytest.mark.skipif(not (ROOT / "tier3-kiro").exists(),
+                    reason="Tier 3 is a preview module, not part of the published sample")
+def test_tier3_codecommit_source_is_explicit_and_exclusive(tmp_path):
+    ctx = {"source": "codecommit", "stack_id": "Tier3PipelineStackRoad", "name_suffix": "-road"}
+    proc, out = _run_app("tier3-kiro", ctx, tmp_path / "a")
+    assert proc.returncode == 0, proc.stderr
+    resources = json.loads((out / "Tier3PipelineStackRoad.template.json").read_text())["Resources"]
+    [source] = [a for r in resources.values() if r["Type"] == "AWS::CodePipeline::Pipeline"
+                for s in r["Properties"]["Stages"] if s["Name"] == "Source" for a in s["Actions"]]
+    assert source["ActionTypeId"]["Provider"] == "CodeCommit"
+    assert source["Configuration"]["RepositoryName"] == "agentic-gates-demo-road"
+    assert source["Configuration"]["BranchName"] == "main"
+    assert source["Configuration"]["OutputArtifactFormat"] == "CODEBUILD_CLONE_REF"
+    proc, _ = _run_app("tier3-kiro", {**ctx, "github_repo": "o/r"}, tmp_path / "b")
+    assert proc.returncode != 0 and "cannot be combined" in proc.stderr
+    proc, _ = _run_app("tier3-kiro", {}, tmp_path / "c")
+    assert proc.returncode != 0 and "-c source=codecommit" in proc.stderr
