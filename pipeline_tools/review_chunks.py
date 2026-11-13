@@ -40,7 +40,7 @@ PLAN_VERSION = 1
 PLAN_FILE = "chunk-plan.json"
 
 _HUNK_RE = re.compile(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-_HEADER_RE = re.compile(r'("(?:\\.|[^"])*"|a/.*?) ("(?:\\.|[^"])*"|b/.*)')
+_HEADER_RE = re.compile(r'("(?:\\.|[^"\\])*"|a/.*?) ("(?:\\.|[^"\\])*"|b/.*)')
 # Diff prefixes of the body lines a hunk may contain.
 _BODY = (" ", "+", "-", "\\")
 

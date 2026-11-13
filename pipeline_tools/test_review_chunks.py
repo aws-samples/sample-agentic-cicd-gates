@@ -4,6 +4,7 @@ import json
 import pathlib
 import re
 import tempfile
+import time
 import unittest
 
 spec = importlib.util.spec_from_file_location(
@@ -236,6 +237,18 @@ class PlanTests(unittest.TestCase):
                 self.assertEqual(data, chunk.text.encode())
                 self.assertEqual(row["sha256"], hashlib.sha256(data).hexdigest())
                 self.assertEqual(sum(u["bytes"] for u in row["units"]), len(data))
+
+
+class HeaderRegexTests(unittest.TestCase):
+    def test_header_regex_does_not_backtrack_exponentially(self):
+        # [^"] also matched a backslash, so '"\!\!...' could split 2^n ways (CodeQL
+        # py/redos): n=26 took 5-9 seconds before the fix. One prefix per quoted group.
+        for prefix in ('"', '"" "'):
+            start = time.monotonic()
+            self.assertIsNone(rc._HEADER_RE.fullmatch(prefix + '\\!' * 26))
+            self.assertLess(time.monotonic() - start, 1, prefix)
+        quoted = r'"a/sp\"ace \\x" "b/sp\"ace \\x"'
+        self.assertEqual(rc._HEADER_RE.fullmatch(quoted).group(2), r'"b/sp\"ace \\x"')
 
 
 if __name__ == "__main__":
