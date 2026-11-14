@@ -26,8 +26,8 @@ The suite now has 25 illustrative cases, including four SEC-003 cases:
 | `xss-escaped-html.diff` | PASS, no SEC-003 | Escaped input in an HTML text node |
 
 The scoring is also covered offline with mocked model outcomes. The latest live
-runs are recorded in [docs/cost.md](../docs/cost.md): two full panel runs on
-2026-10-30 (Pacific time) each met all criteria on 25 of 25 cases. When you run
+runs are recorded in [docs/cost.md](../docs/cost.md): two full runs of the current
+panel on 2026-11-06 (Pacific time) each met all criteria on 25 of 25 cases. When you run
 the suite, keep the rules and commit, individual results, misses, false
 positives, errors and token usage with the result. The script's token price
 table is a configured estimate, and its totals exclude pipeline infrastructure.
