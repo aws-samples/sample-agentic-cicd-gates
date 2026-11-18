@@ -68,9 +68,9 @@ shared code computes the verdict from the rules file:
 | Reviewer | Model in the sample policy | Scope |
 |---|---|---|
 | Security Review Agent | `us.anthropic.claude-opus-5-5` | Injection, secrets, IAM scope; can block |
-| Code Quality Review Agent | `us.openai.gpt-6.1-sol` | Correctness and maintainability; advisory |
+| Code Quality Review Agent | `us.openai.gpt-6.2-sol` | Correctness and maintainability; advisory |
 | Architecture Review Agent | `us.anthropic.claude-sonnet-5-5` | Layering and module boundaries; advisory |
-| Accessibility Review Agent | `us.anthropic.claude-fable-5-1` | Interface files only; can block |
+| Accessibility Review Agent | `us.anthropic.claude-fable-5-2` | Interface files only; can block |
 
 The model IDs are configuration examples. Use models that are available to
 your account and Region, and decide yourself which rules block.

@@ -1,6 +1,6 @@
 {
   "source": ".reviewer.yaml at dashboard build (not historical review policy)",
-  "sha256": "629ae7e63c840a92eeced9df696a3c7b1ccd03d104576603388b8561d602f8d4",
+  "sha256": "c0162bba235953d630b65297f97b698c3d33e2687546d55c74bc7207f73bdfdc",
   "agents": [
     {
       "name": "Security Review Agent",
@@ -18,7 +18,7 @@
       "name": "Code Quality Review Agent",
       "persona": "Pragmatic staff engineer focused on correctness and maintainability. Flags swallowed errors, misleading names, and fragile constructs; keeps opinions to rules and lets style debates go.",
       "emoji": "\u26a1",
-      "model": "us.openai.gpt-6.1-sol",
+      "model": "us.openai.gpt-6.2-sol",
       "thinking": "high",
       "rules": [
         "STYLE-",
@@ -39,7 +39,7 @@
       "name": "Accessibility Review Agent",
       "persona": "Accessibility reviewer. Holds WCAG 2.2 AA as the bar: every control reachable and operable by keyboard, every non-text thing named, text that meets contrast, and no motion or colour that carries meaning on its own. Blocks \u2014 an inaccessible ship is a broken ship.",
       "emoji": "\u267f",
-      "model": "us.anthropic.claude-fable-5-1",
+      "model": "us.anthropic.claude-fable-5-2",
       "thinking": "high",
       "rules": [
         "A11Y-"
