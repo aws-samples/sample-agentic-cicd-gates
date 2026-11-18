@@ -21,7 +21,7 @@ agents:
       Flags swallowed errors, misleading names, and fragile constructs; keeps
       opinions to rules and lets style debates go.
     emoji: "⚡"
-    model: us.openai.gpt-6.1-sol        # cross-model: OpenAI via Bedrock
+    model: us.openai.gpt-6.2-sol        # cross-model: OpenAI via Bedrock
     thinking: high
     rules: [STYLE-, ROB-]
   - name: "Architecture Review Agent"
@@ -47,7 +47,7 @@ agents:
     # away from the exploit-shaped security demos elsewhere in the diff — a
     # blocking seat that refuses its input is worse than no seat, so it also
     # fails CLOSED on error (verdict.error_result).
-    model: us.anthropic.claude-fable-5-1
+    model: us.anthropic.claude-fable-5-2
     thinking: high
     rules: [A11Y-]
     file_patterns: ["**/*.html", "**/*.htm", "**/*.css", "**/*.tsx", "**/*.jsx",
